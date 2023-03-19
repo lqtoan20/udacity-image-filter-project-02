@@ -1,17 +1,25 @@
-import express from 'express';
-import bodyParser from 'body-parser';
-import {filterImageFromURL, deleteLocalFiles} from './util/util';
+import bodyParser from "body-parser";
+import { filterImageFromURL, deleteLocalFiles } from "./util/util";
+import express, { Request, Response } from "express";
+import { authMiddleware } from "./auth/basic-auth";
 
 (async () => {
-
   // Init the Express application
   const app = express();
 
   // Set the network port
   const port = process.env.PORT || 8082;
-  
+
+  // define status code
+  const HTTP_STATUS_OK = 200;
+  const HTTP_STATUS_NOT_FOUND = 404;
+  const HTTP_STATUS_INTERNAL_SERVER_ERROR = 500;
+
   // Use the body parser middleware for post requests
   app.use(bodyParser.json());
+
+  // Apply basic auth
+  app.use(authMiddleware);
 
   // @TODO1 IMPLEMENT A RESTFUL ENDPOINT
   // GET /filteredimage?image_url={{URL}}
@@ -28,19 +36,50 @@ import {filterImageFromURL, deleteLocalFiles} from './util/util';
   //   the filtered image file [!!TIP res.sendFile(filteredpath); might be useful]
 
   /**************************************************************************** */
+  app.get(
+    "/filteredimage/",
+    authMiddleware,
+    async (req: Request, res: Response) => {
+      const imageUrl = req.query.image_url;
+      if (!imageUrl) {
+        return res
+          .status(HTTP_STATUS_NOT_FOUND)
+          .send("Image_url parameter is required");
+      }
 
+      try {
+        // Call filterImageFromURL to filter the image
+        const filteredPath = await filterImageFromURL(imageUrl);
+
+        // Send the resulting file in the response
+        res.status(HTTP_STATUS_OK).sendFile(filteredPath, {}, (err) => {
+          if (err) {
+            return res
+              .status(HTTP_STATUS_INTERNAL_SERVER_ERROR)
+              .send("Can't send file");
+          }
+
+          // Delete the file on finish of the response
+          deleteLocalFiles([filteredPath]);
+        });
+      } catch (err) {
+        return res
+          .status(HTTP_STATUS_INTERNAL_SERVER_ERROR)
+          .send("Some thing was wrong, please check your server !");
+      }
+    }
+  );
   //! END @TODO1
-  
+
   // Root Endpoint
   // Displays a simple message to the user
-  app.get( "/", async ( req, res ) => {
-    res.send("try GET /filteredimage?image_url={{}}")
-  } );
-  
+  app.get("/", async (req, res) => {
+    res.send("try GET /filteredimage?image_url={{}}");
+  });
 
   // Start the Server
-  app.listen( port, () => {
-      console.log( `server running http://localhost:${ port }` );
-      console.log( `press CTRL+C to stop server` );
-  } );
+  app.listen(port, () => {
+    console.log(`server running http://localhost:${port}`);
+    console.log(`press CTRL+C to stop server`);
+  });
 })();
