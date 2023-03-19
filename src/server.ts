@@ -45,7 +45,7 @@ import express, { Request, Response } from "express";
       const filteredPath = await filterImageFromURL(imageUrl);
 
       // Send the resulting file in the response
-      res.sendFile(filteredPath, {}, (err) => {
+      res.status(HTTP_STATUS_OK).sendFile(filteredPath, {}, (err) => {
         if (err) {
           return res
             .status(HTTP_STATUS_INTERNAL_SERVER_ERROR)
