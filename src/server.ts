@@ -1,6 +1,7 @@
 import bodyParser from "body-parser";
 import { filterImageFromURL, deleteLocalFiles } from "./util/util";
 import express, { Request, Response } from "express";
+import { authMiddleware } from "./auth/basic-auth";
 
 (async () => {
   // Init the Express application
@@ -17,6 +18,9 @@ import express, { Request, Response } from "express";
   // Use the body parser middleware for post requests
   app.use(bodyParser.json());
 
+  // Apply basic auth
+  app.use(authMiddleware);
+
   // @TODO1 IMPLEMENT A RESTFUL ENDPOINT
   // GET /filteredimage?image_url={{URL}}
   // endpoint to filter an image from a public url.
@@ -32,35 +36,39 @@ import express, { Request, Response } from "express";
   //   the filtered image file [!!TIP res.sendFile(filteredpath); might be useful]
 
   /**************************************************************************** */
-  app.get("/filteredimage/", async (req: Request, res: Response) => {
-    const imageUrl = req.query.image_url;
-    if (!imageUrl) {
-      return res
-        .status(HTTP_STATUS_NOT_FOUND)
-        .send("Image_url parameter is required");
+  app.get(
+    "/filteredimage/",
+    authMiddleware,
+    async (req: Request, res: Response) => {
+      const imageUrl = req.query.image_url;
+      if (!imageUrl) {
+        return res
+          .status(HTTP_STATUS_NOT_FOUND)
+          .send("Image_url parameter is required");
+      }
+
+      try {
+        // Call filterImageFromURL to filter the image
+        const filteredPath = await filterImageFromURL(imageUrl);
+
+        // Send the resulting file in the response
+        res.status(HTTP_STATUS_OK).sendFile(filteredPath, {}, (err) => {
+          if (err) {
+            return res
+              .status(HTTP_STATUS_INTERNAL_SERVER_ERROR)
+              .send("Can't send file");
+          }
+
+          // Delete the file on finish of the response
+          deleteLocalFiles([filteredPath]);
+        });
+      } catch (err) {
+        return res
+          .status(HTTP_STATUS_INTERNAL_SERVER_ERROR)
+          .send("Some thing was wrong, please check your server !");
+      }
     }
-
-    try {
-      // Call filterImageFromURL to filter the image
-      const filteredPath = await filterImageFromURL(imageUrl);
-
-      // Send the resulting file in the response
-      res.status(HTTP_STATUS_OK).sendFile(filteredPath, {}, (err) => {
-        if (err) {
-          return res
-            .status(HTTP_STATUS_INTERNAL_SERVER_ERROR)
-            .send("Can't send file");
-        }
-
-        // Delete the file on finish of the response
-        deleteLocalFiles([filteredPath]);
-      });
-    } catch (err) {
-      return res
-        .status(HTTP_STATUS_INTERNAL_SERVER_ERROR)
-        .send("Some thing was wrong, please check your server !");
-    }
-  });
+  );
   //! END @TODO1
 
   // Root Endpoint
