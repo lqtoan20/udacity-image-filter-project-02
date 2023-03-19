@@ -58,7 +58,7 @@ import express, { Request, Response } from "express";
     } catch (err) {
       return res
         .status(HTTP_STATUS_INTERNAL_SERVER_ERROR)
-        .send("Some thing was wrong, please check your server");
+        .send("Some thing was wrong, please check your server !");
     }
   });
   //! END @TODO1
