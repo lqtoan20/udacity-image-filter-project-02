@@ -1,7 +1,6 @@
-import express from "express";
 import bodyParser from "body-parser";
 import { filterImageFromURL, deleteLocalFiles } from "./util/util";
-import { Router, Request, Response } from "express";
+import express, { Request, Response } from "express";
 
 (async () => {
   // Init the Express application
@@ -9,6 +8,11 @@ import { Router, Request, Response } from "express";
 
   // Set the network port
   const port = process.env.PORT || 8082;
+
+  // define status code
+  const HTTP_STATUS_OK = 200;
+  const HTTP_STATUS_NOT_FOUND = 404;
+  const HTTP_STATUS_INTERNAL_SERVER_ERROR = 500;
 
   // Use the body parser middleware for post requests
   app.use(bodyParser.json());
@@ -28,18 +32,34 @@ import { Router, Request, Response } from "express";
   //   the filtered image file [!!TIP res.sendFile(filteredpath); might be useful]
 
   /**************************************************************************** */
-  const HTTP_STATUS_OK = 200;
-  const HTTP_STATUS_NOT_FOUND = 404;
   app.get("/filteredimage/", async (req: Request, res: Response) => {
-    const image_url = req.query.image_url;
-    if (image_url.length === 0) {
-      res.status(HTTP_STATUS_NOT_FOUND).send("Image URL is required!");
+    const imageUrl = req.query.image_url;
+    if (!imageUrl) {
+      return res
+        .status(HTTP_STATUS_NOT_FOUND)
+        .send("Image_url parameter is required");
     }
 
-    const filtered_image = await filterImageFromURL(image_url);
-    res.status(HTTP_STATUS_OK).sendFile(filtered_image, () => {
-      deleteLocalFiles([filtered_image]);
-    });
+    try {
+      // Call filterImageFromURL to filter the image
+      const filteredPath = await filterImageFromURL(imageUrl);
+
+      // Send the resulting file in the response
+      res.sendFile(filteredPath, {}, (err) => {
+        if (err) {
+          return res
+            .status(HTTP_STATUS_INTERNAL_SERVER_ERROR)
+            .send("Can't send file");
+        }
+
+        // Delete the file on finish of the response
+        deleteLocalFiles([filteredPath]);
+      });
+    } catch (err) {
+      return res
+        .status(HTTP_STATUS_INTERNAL_SERVER_ERROR)
+        .send("Some thing was wrong, please check your server");
+    }
   });
   //! END @TODO1
 
